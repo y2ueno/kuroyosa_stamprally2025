@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>QR Code Scanner</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js" defer></script>
+    <style>
+        /* 基本的なスタイリング (任意) */
+        body { font-family: sans-serif; }
+        #qr-reader { max-width: 500px; margin: auto; }
+        #qr-reader-results { margin-top: 20px; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="qr-reader"></div>
+    <div id="qr-reader-results"></div>
+
+    <script src="scanner.js" defer></script>
+</body>
+</html>

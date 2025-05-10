@@ -2,7 +2,7 @@
 
 // QRスキャナーからのスキャンデータオブジェクトを想定
 // 例：{ qrValue: "https://example.com/stamp/123", deviceId: "scanner001" }
-const gasWebAppUrl = 'https://script.google.com/macros/s/AKfycbwMAFYgCUR6dgcKxN2QJcTd8LwdsZcMrExc78P0b6oX7qhvNwpie5oI0E_HeaRUFwBE/exec';
+const gasWebAppUrl = "https://script.google.com/macros/s/AKfycbwMAFYgCUR6dgcKxN2QJcTd8LwdsZcMrExc78P0b6oX7qhvNwpie5oI0E_HeaRUFwBE/exec";
 
 async function sendDataToGAS_FormUrlEncoded(dataPayload) {
     const formData = new URLSearchParams();

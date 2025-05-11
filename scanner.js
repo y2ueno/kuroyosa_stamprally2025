@@ -2,8 +2,8 @@
 
 // --- Configuration ---
 // GAS Web Appのデプロイ済みURLを設定 (必ず実際のURLに置き換えてください)
-// 新しいデプロイメントURL: https://script.google.com/macros/s/AKfycbwtnySgVBvIfyjkyEy2vtGeKcLUi9ZqOVTp8eUNzWryy7CNtZYjMwe0hXF1K9Oyuh6cSA/exec
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtnySgVBvIfyjkyEy2vtGeKcLUi9ZqOVTp8eUNzWryy7CNtZYjMwe0hXF1K9Oyuh6cSA/exec";
+// 新しいデプロイメントURL: https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec";
 // -------------------
 
 /**

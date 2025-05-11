@@ -26,8 +26,8 @@ async function testGetDataFromSheet(gasWebAppUrl) {
 
 
 // --- Configuration ---
-// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"; // ★★★ URLの重複を修正しました ★★★
+// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbwLeeOYby80z5bhXA6F-ct0f8omT8rtBQqBajkC-qczBuj07EBt1A-PKRZJ6231KBerRw/exec"
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwLeeOYby80z5bhXA6F-ct0f8omT8rtBQqBajkC-qczBuj07EBt1A-PKRZJ6231KBerRw/exec"; // ★★★ URLの重複を修正しました ★★★
 // -------------------
 
 /**

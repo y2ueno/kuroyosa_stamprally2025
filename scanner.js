@@ -1,8 +1,8 @@
 // scanner.js
 
 // --- Configuration ---
-// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbyWmZX0ZXy9pc7FkcKetraaDsXMLWGb7u0bmZSXouZ2yhHL8-GBQYZD3Jn3y-FmhzufCg/exec"
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbyWmZX0ZXy9pc7FkcKetraaDsXMLWGb7u0bmZSXouZ2yhHL8-GBQYZD3Jn3y-FmhzufCg/exec"; // ★★★ URLの重複を修正しました ★★★
+// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"; // ★★★ URLの重複を修正しました ★★★
 // -------------------
 
 /**

@@ -1,7 +1,7 @@
 // scanner.js
 
 // --- Configuration ---
-// GAS Web Appのデプロイ済みURLを設定
+// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbxgytcOL_bBEbcDobZwZ128jDyuhc7c8Hi4NA7pTXmCixteAiSQDomMJWl5BAcsGnsoCw/exec"
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxgytcOL_bBEbcDobZwZ128jDyuhc7c8Hi4NA7pTXmCixteAiSQDomMJWl5BAcsGnsoCw/exec"; // ★★★ URLの重複を修正しました ★★★
 // -------------------
 

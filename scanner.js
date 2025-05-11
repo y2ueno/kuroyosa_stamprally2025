@@ -2,7 +2,7 @@
 
 // --- Configuration ---
 // GAS Web Appのデプロイ済みURLを設定
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxQEeynYuzsnIJy-9MRbB7BDUgpKNpfi0jpBhwjj3pNUCtNnZmJyFmdUE4sWJ_jLlrBHw/exec"; // あなたのGAS Web App URLに置き換えてください
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwtnySgVBvIfyjkyEy2vtGeKcLUi9ZqOVTp8eUNzWryy7CNtZYjMwe0hXF1K9Oyuh6cSA/exec"; // あなたのGAS Web App URLに置き換えてください
 // -------------------
 
 /**

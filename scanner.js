@@ -1,5 +1,30 @@
 // scanner.js
 
+
+// scanner.js にテスト用関数を追加
+async function testGetDataFromSheet(gasWebAppUrl) {
+  console.log("テストGETリクエスト送信先URL:", gasWebAppUrl);
+  try {
+    // GETリクエストなので、URLにパラメータを追加
+    const testUrl = new URL(gasWebAppUrl);
+    testUrl.searchParams.append('testParam', 'helloFromGet');
+
+    const response = await fetch(testUrl.toString(), { // URLオブジェクトを文字列に変換
+      method: 'GET',
+      // GETなのでheadersやbodyは通常不要
+      redirect: 'follow'
+    });
+    const responseBodyText = await response.text();
+    console.log("テストGET サーバーからの生レスポンステキスト:", responseBodyText);
+    // doGetは通常HTMLやTEXTを返すのでJSON.parseはしない
+  } catch (error) {
+    console.error('テストGET データ送信エラー:', error);
+  }
+}
+// onScanSuccess などから呼び出す
+// testGetDataFromSheet(GAS_WEB_APP_URL);
+
+
 // --- Configuration ---
 // GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxbGwcvrNtn4p7dxl0hExEiSMwJxu4lTMuPCThbqbYO51C0QeyVNvoV0LdmsC4FqS3a/exec"; // ★★★ URLの重複を修正しました ★★★

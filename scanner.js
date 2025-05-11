@@ -1,56 +1,81 @@
-//scanner.js
+// scanner.js
 
-// QRスキャナーからのスキャンデータオブジェクトを想定
-// 例：{ qrValue: "https://example.com/stamp/123", deviceId: "scanner001" }
-const gasWebAppUrl = "https://script.google.com/macros/s/AKfycbwMAFYgCUR6dgcKxN2QJcTd8LwdsZcMrExc78P0b6oX7qhvNwpie5oI0E_HeaRUFwBE/exec";
+// 'gasWebAppUrl' は Google Apps Script のデプロイメント URL とします。
+// 'dataToSend' は以下のような JavaScript オブジェクトとします。
+// const dataToSend = {
+//   scannedValue: "ABC123XYZ",
+//   timestamp: new Date().toISOString(),
+//   scannerId: "Scanner_001"
+// };
 
-async function sendDataToGAS_FormUrlEncoded(dataPayload) {
-    const formData = new URLSearchParams();
-    // dataPayloadオブジェクトからformDataを生成
-    for (const key in dataPayload) {
-        if (dataPayload.hasOwnProperty(key)) {
-            formData.append(key, dataPayload[key]);
-        }
+async function sendDataToSheet(gasWebAppUrl, dataToSend) {
+  console.log("Sending data to GAS:", dataToSend);
+
+  try {
+    const response = await fetch(gasWebAppUrl, {
+      method: "POST",
+      mode: "cors", // クロスオリジンリクエストには重要
+      cache: "no-cache", // オプション: POST リクエストのキャッシュを防ぐため
+      redirect: "follow", // GAS /exec URL には不可欠
+      headers: {
+        // 重要: GAS でのプリフライト OPTIONS リクエスト問題を回避するために text/plain を使用
+        "Content-Type": "text/plain;charset=utf-8",
+      },
+      body: JSON.stringify(dataToSend), // JS オブジェクトを文字列化
+    });
+
+    // レスポンスが ok (ステータスが 200-299 の範囲) かどうかを確認
+    if (!response.ok) {
+      // 可能であればレスポンスボディから詳細を取得
+      let errorBody = "サーバーからのエラー詳細なし。";
+      try {
+        // GAS からのJSONエラーを期待する場合は response.json()
+        errorBody = await response.text();
+      } catch (parseError) {
+        console.error("エラーレスポンスボディの解析に失敗:", parseError);
+      }
+      throw new Error(
+        `HTTP error! Status: ${response.status}. Server says: ${errorBody}`
+      );
     }
 
-    try {
-        const response = await fetch(gasWebAppUrl, {
-            method: 'POST',
-            // 'Content-Type'ヘッダーは、ボディがURLSearchParamsオブジェクトの場合、
-            // ブラウザによって自動的に'application/x-www-form-urlencoded;charset=UTF-8'に設定されます。
-            // 明示的な設定は通常不要ですが、明確にするために行うこともできます：
-            // headers: {
-            //   'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
-            // },
-            body: formData,
-            redirect: 'follow' // GASウェブアプリには不可欠
-        });
+    // GAS が JSON を返すと仮定して解析 (GAS がプレーンテキストを返す場合は response.text())
+    const result = await response.json();
+    console.log("Success:", result);
+    // 成功時の処理 (例: ユーザーに成功メッセージを表示)
+    // 例: if (result.status === "success") { alert("データが送信されました！"); }
 
-        if (!response.ok) {
-            // response.okはステータスが200-299の場合にtrue
-            // これは、GAS自体が処理後（または処理失敗後）に返すHTTPエラーをキャッチします
-            const errorText = await response.text(); // 可能であればレスポンスボディから詳細を取得
-            console.error(`GAS HTTP Error: ${response.status} ${response.statusText}`, errorText);
-            throw new Error(`サーバーがステータスで応答しました： ${response.status}. 詳細： ${errorText}`);
-        }
+    return result; // GAS から解析された結果を返す
 
-        // GASが成功/失敗を示すテキストまたはJSONレスポンスを返すと仮定
-        const responseData = await response.text(); // またはGASがJSONを返す場合はresponse.json()
-        console.log('GASへのデータ送信に成功しました（form-urlencoded）。レスポンス：', responseData);
-        // GASからのレスポンスを処理するための追加ロジックをここに追加します（例：UIの更新）
-        return responseData;
-
-    } catch (error) {
-        // これはネットワークエラー（例：DNS障害、サーバー到達不能）
-        // または!response.okブロックからスローされたエラーをキャッチします。
-        console.error('GASへのデータ送信エラー（form-urlencoded）：', error);
-        // ここにユーザー向けのエラー処理を追加します
-        throw error; // コールスタックのさらに上で処理したい場合は再スローします
-    }
+  } catch (error) {
+    console.error("Google Apps Script へのデータ送信エラー:", error);
+    // エラー処理 (例: ユーザーにエラーメッセージを表示)
+    // alert(`エラー: ${error.message}`);
+    throw error; // 呼び出し元のコードで処理する場合はエラーを再スロー
+  }
 }
 
-// 使用例：
-// const scannedDataObject = { qrData: "some_qr_value", scannedAt: new Date().toISOString() };
-// sendDataToGAS_FormUrlEncoded(scannedDataObject)
-//  .then(result => console.log("GAS呼び出し成功。"))
-//  .catch(err => console.log("GAS呼び出し失敗。"));`
+// --- 使用例 ---
+// const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwMAFYgCUR6dgcKxN2QJcTd8LwdsZcMrExc78P0b6oX7qhvNwpie5oI0E_HeaRUFwBE/exec";
+// const scannedData = {
+//   barcode: "1234567890",
+//   scanTime: new Date().toISOString(),
+//   deviceId: "Scanner_Mobile_01"
+// };
+//
+// sendDataToSheet(WEB_APP_URL, scannedData)
+//  .then(gasResponse => {
+//     console.log("GAS Response received:", gasResponse);
+//     if (gasResponse && gasResponse.status === 'success') {
+//       // UI を成功状態に更新
+//       // alert("データ送信成功: " + gasResponse.message);
+//     } else {
+//       // gasResponse.message に基づいて UI を失敗状態に更新
+//       // alert("データ送信失敗: " + (gasResponse? gasResponse.message : "不明なエラー"));
+//     }
+//   })
+//  .catch(err => {
+//     console.error("データ送信に失敗しました:", err);
+//     // ネットワークエラーまたは重大な fetch エラーの場合に UI を更新
+//     // alert("通信エラーが発生しました: " + err.message);
+//   });

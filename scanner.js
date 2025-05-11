@@ -1,8 +1,10 @@
 // scanner.js
 
 // --- Configuration ---
-// GAS Web Appのデプロイ済みURLを設定 (必ず実際のURLに置き換えてください)
-// 新しいデプロイメントURL: https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec
+// GAS Web Appのデプロイ済みURLを設定
+// ユーザー提供の新しいURL: https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec
+// 前回のURL: https://script.google.com/macros/s/AKfycbwtnySgVBvIfyjkyEy2vtGeKcLUi9ZqOVTp8eUNzWryy7CNtZYjMwe0hXF1K9Oyuh6cSA/exec
+// どちらのURLを使用するべきかユーザーに確認が必要です。ここでは新しい方のURLを使用します。
 const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec";
 // -------------------
 
@@ -41,11 +43,10 @@ function updateResultsDisplay(message, type = 'info') {
  * @param {string} gasWebAppUrl GAS Web AppのURL
  */
 async function sendDataToSheet(email, qrData, gasWebAppUrl) {
-  // 送信するデータをURLSearchParamsで構築
   const formData = new URLSearchParams();
   formData.append('email', email);
   formData.append('qrData', qrData);
-  formData.append('scannedAt', new Date().toISOString()); // クライアント側のスキャン時刻も送信
+  formData.append('scannedAt', new Date().toISOString());
 
   console.log("送信データ (form-urlencoded):", formData.toString());
   console.log("送信先URL:", gasWebAppUrl);
@@ -56,18 +57,23 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
     const response = await fetch(gasWebAppUrl, {
       method: 'POST',
       headers: {
-        // 'Content-Type': 'application/x-www-form-urlencoded', // URLSearchParams を使う場合、ブラウザが自動で設定することが多いが、明示しても良い
+        // Content-Typeを明示的に指定。charsetも追加。
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
-      body: formData, // URLSearchParamsオブジェクトを直接bodyに指定
-      // mode: 'cors', // GAS側でCORS設定が正しければ不要。
-      redirect: 'follow'
+      body: formData.toString(), // URLSearchParamsオブジェクトを文字列化して送信
+      redirect: 'follow',
+      // mode: 'cors' // 'no-cors' にするとレスポンスが取得できなくなるため、通常は 'cors' (デフォルト)
     });
 
     const responseBodyText = await response.text();
+    console.log("サーバーからの生レスポンステキスト:", responseBodyText);
+
 
     if (!response.ok) {
+      // response.ok (ステータスが200-299) でない場合
       console.error(`HTTPエラー! ステータス: ${response.status}, ボディ: ${responseBodyText}`);
-      throw new Error(`サーバーとの通信に失敗しました (ステータス: ${response.status})。`);
+      // CORSエラーの場合、response.statusが0になることがあるが、その場合は Failed to fetch で catch されることが多い
+      throw new Error(`サーバーとの通信に失敗しました (ステータス: ${response.status})。詳細はコンソールを確認してください。`);
     }
 
     let result;
@@ -75,27 +81,28 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
         result = JSON.parse(responseBodyText);
     } catch (parseError) {
         console.error("サーバーからのJSON応答の解析に失敗:", responseBodyText, parseError);
-        throw new Error("サーバーからの応答が予期しない形式でした。");
+        // GASがHTMLエラーページなどを返した場合、JSONパースは失敗する
+        throw new Error(`サーバーからの応答が予期しない形式でした。内容: ${responseBodyText.substring(0, 100)}...`);
     }
 
-    console.log('サーバーからのレスポンス:', result);
+    console.log('サーバーからのパース済みレスポンス:', result);
 
     if (result && result.status === 'success') {
         alert('スタンプが正常に記録されました！\nQR内容: ' + qrData);
         updateResultsDisplay(`記録成功: ${qrData}`, 'success');
     } else {
-        const errorMessage = result && result.message ? result.message : "サーバー側で処理に失敗しました。";
-        console.error('サーバーサイド処理エラー:', errorMessage, result);
+        const errorMessage = result && result.message ? result.message : "サーバー側で処理に失敗したか、予期しない応答がありました。";
+        console.error('サーバーサイド処理エラーまたは予期しない応答:', errorMessage, result);
         throw new Error(errorMessage);
     }
 
   } catch (error) {
-    console.error('データ送信エラー:', error);
-    alert('スタンプ記録エラー:\n' + error.message + "\nQR内容: " + qrData + "\n開発者に連絡してください。");
+    // fetch自体が失敗した場合 (ネットワークエラー、CORSブロックなど)
+    console.error('データ送信エラー (fetch catch):', error);
+    alert('スタンプ記録エラーが発生しました。\nエラー内容: ' + error.message + "\nQR内容: " + qrData + "\nインターネット接続を確認するか、開発者に連絡してください。");
     updateResultsDisplay(`送信エラー: ${qrData}`, 'error');
   }
 }
-
 
 /**
  * QRコードのスキャンが成功したときに呼び出されるコールバック関数
@@ -116,11 +123,11 @@ function onScanSuccess(decodedText, decodedResult) {
         return;
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") { // YOUR_GAS_WEB_APP_URL_HERE は初期値のプレースホルダ
-         const errorMsg = "エラー: 送信先システムが設定されていません。開発者に連絡してください。";
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) {
+         const errorMsg = "エラー: 送信先システムが正しく設定されていません。開発者に連絡してください。";
          console.error(errorMsg);
          alert(errorMsg);
-         updateResultsDisplay('エラー: 送信先未設定', 'error');
+         updateResultsDisplay('エラー: 送信先URL未設定', 'error');
          return;
     }
 
@@ -151,7 +158,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "YOUR_GAS_WEB_APP_URL_HERE") {
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) {
         const errorMsg = "警告: アプリケーションの送信先URLが設定されていません。scanner.jsファイル内のGAS_WEB_APP_URLを更新してください。";
         console.warn(errorMsg);
         updateResultsDisplay(errorMsg, 'error');

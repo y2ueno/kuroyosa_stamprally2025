@@ -2,10 +2,7 @@
 
 // --- Configuration ---
 // GAS Web Appのデプロイ済みURLを設定
-// ユーザー提供の新しいURL: https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec
-// 前回のURL: https://script.google.com/macros/s/AKfycbwtnySgVBvIfyjkyEy2vtGeKcLUi9ZqOVTp8eUNzWryy7CNtZYjMwe0hXF1K9Oyuh6cSA/exec
-// どちらのURLを使用するべきかユーザーに確認が必要です。ここでは新しい方のURLを使用します。
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec";
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzQ6IVwPHWA0bdOCR7gMZENNaN3bcMyIolyuAXdgV8EQjpp3gArI55RjrVuVAZ54DvoSw/exec"; // ★★★ URLの重複を修正しました ★★★
 // -------------------
 
 /**
@@ -57,23 +54,24 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
     const response = await fetch(gasWebAppUrl, {
       method: 'POST',
       headers: {
-        // Content-Typeを明示的に指定。charsetも追加。
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
-      body: formData.toString(), // URLSearchParamsオブジェクトを文字列化して送信
+      body: formData.toString(),
       redirect: 'follow',
-      // mode: 'cors' // 'no-cors' にするとレスポンスが取得できなくなるため、通常は 'cors' (デフォルト)
     });
 
-    const responseBodyText = await response.text();
+    const responseBodyText = await response.text(); // まずテキストとしてレスポンスを取得
     console.log("サーバーからの生レスポンステキスト:", responseBodyText);
 
-
-    if (!response.ok) {
-      // response.ok (ステータスが200-299) でない場合
+    if (!response.ok) { // ステータスコードが200-299の範囲外の場合
       console.error(`HTTPエラー! ステータス: ${response.status}, ボディ: ${responseBodyText}`);
-      // CORSエラーの場合、response.statusが0になることがあるが、その場合は Failed to fetch で catch されることが多い
-      throw new Error(`サーバーとの通信に失敗しました (ステータス: ${response.status})。詳細はコンソールを確認してください。`);
+      throw new Error(`サーバーとの通信に失敗しました (ステータス: ${response.status})。応答: ${responseBodyText.substring(0,100)}`);
+    }
+
+    // レスポンスが空でないか確認してからJSONパースを試みる
+    if (!responseBodyText) {
+        console.error("サーバーからの応答が空でした。");
+        throw new Error("サーバーから空の応答がありました。");
     }
 
     let result;
@@ -81,8 +79,7 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
         result = JSON.parse(responseBodyText);
     } catch (parseError) {
         console.error("サーバーからのJSON応答の解析に失敗:", responseBodyText, parseError);
-        // GASがHTMLエラーページなどを返した場合、JSONパースは失敗する
-        throw new Error(`サーバーからの応答が予期しない形式でした。内容: ${responseBodyText.substring(0, 100)}...`);
+        throw new Error(`サーバーからの応答をJSONとして解析できませんでした。内容: ${responseBodyText.substring(0, 100)}...`);
     }
 
     console.log('サーバーからのパース済みレスポンス:', result);
@@ -96,10 +93,9 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
         throw new Error(errorMessage);
     }
 
-  } catch (error) {
-    // fetch自体が失敗した場合 (ネットワークエラー、CORSブロックなど)
-    console.error('データ送信エラー (fetch catch):', error);
-    alert('スタンプ記録エラーが発生しました。\nエラー内容: ' + error.message + "\nQR内容: " + qrData + "\nインターネット接続を確認するか、開発者に連絡してください。");
+  } catch (error) { // fetch自体が失敗した場合 (ネットワークエラー、CORSブロックなど) または上記でthrowされたエラー
+    console.error('データ送信処理エラー (sendDataToSheet catch):', error.name, error.message, error.stack);
+    alert('スタンプ記録エラーが発生しました。\nエラー: ' + error.message + "\nQR内容: " + qrData + "\nインターネット接続を確認するか、開発者に連絡してください。");
     updateResultsDisplay(`送信エラー: ${qrData}`, 'error');
   }
 }
@@ -110,7 +106,7 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
  * @param {object} decodedResult 詳細なデコード結果オブジェクト
  */
 function onScanSuccess(decodedText, decodedResult) {
-    console.log(`コード検出成功 = ${decodedText}`, decodedResult);
+    console.log(`コード検出成功 = ${decodedText}`, decodedResult); // scanner.js:113
     updateResultsDisplay(`スキャン結果: ${decodedText}`, 'info');
 
     const userEmail = getQueryParam('email');
@@ -123,15 +119,15 @@ function onScanSuccess(decodedText, decodedResult) {
         return;
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) {
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE") || GAS_WEB_APP_URL.trim() === "") {
          const errorMsg = "エラー: 送信先システムが正しく設定されていません。開発者に連絡してください。";
-         console.error(errorMsg);
+         console.error(errorMsg, "Current GAS_WEB_APP_URL:", `"${GAS_WEB_APP_URL}"`);
          alert(errorMsg);
          updateResultsDisplay('エラー: 送信先URL未設定', 'error');
          return;
     }
 
-    sendDataToSheet(userEmail, decodedText, GAS_WEB_APP_URL);
+    sendDataToSheet(userEmail, decodedText, GAS_WEB_APP_URL); // scanner.js:134
 }
 
 /**
@@ -146,7 +142,7 @@ function onScanFailure(error) {
 document.addEventListener('DOMContentLoaded', (event) => {
     const userEmailDisplay = document.getElementById('user-email-display');
     const userEmail = getQueryParam('email');
-    console.log("ページ読み込み完了。ユーザー:", userEmail);
+    console.log("ページ読み込み完了。ユーザー:", userEmail); // scanner.js:149
 
     if (userEmailDisplay) {
         if (userEmail) {
@@ -158,7 +154,7 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE")) {
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE") || GAS_WEB_APP_URL.trim() === "") {
         const errorMsg = "警告: アプリケーションの送信先URLが設定されていません。scanner.jsファイル内のGAS_WEB_APP_URLを更新してください。";
         console.warn(errorMsg);
         updateResultsDisplay(errorMsg, 'error');

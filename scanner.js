@@ -1,11 +1,4 @@
-// scanner.js
-
-// --- Configuration ---
-// ★★★重要★★★: Google Apps Scriptのウェブアプリを「新しいデプロイ」でデプロイし、
-// 発行されたウェブアプリのURLを以下の "" の中に正確に貼り付けてください。
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzAmnpzUlKshb8g_MYYzYHwAD8VlkM1BpICSxkHOmq4-x88PE4EKc1Dq6GKmLuuh_0b/exec";
-// 例: "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
-// -------------------
+// scanner.js (window.parent.postMessage連携版)
 
 /**
  * URLクエリパラメータを取得するヘルパー関数
@@ -38,100 +31,68 @@ function updateResultsDisplay(message, type = 'info') {
 }
 
 /**
- * Google Apps Script Web Appにデータを送信する非同期関数 (x-www-form-urlencoded)
- * @param {string} email ユーザーのメールアドレス
- * @param {string} qrData スキャンされたQRコードデータ
- * @param {string} gasWebAppUrl GAS Web AppのURL
- */
-async function sendDataToSheet(email, qrData, gasWebAppUrl) {
-  const formData = new URLSearchParams();
-  formData.append('email', email);
-  formData.append('qrData', qrData);
-  formData.append('scannedAt', new Date().toISOString()); // クライアント側のスキャン時刻
-
-  console.log("送信データ (form-urlencoded):", formData.toString());
-  console.log("送信先URL:", gasWebAppUrl);
-
-  updateResultsDisplay('サーバーに送信中...', 'info');
-
-  try {
-    const response = await fetch(gasWebAppUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      },
-      body: formData.toString(),
-      redirect: 'follow', // リダイレクトを追従
-    });
-
-    const responseBodyText = await response.text();
-    console.log("サーバーからの生レスポンステキスト:", responseBodyText);
-
-    if (!response.ok) {
-      // HTTPステータスコードが200-299の範囲外の場合
-      console.error(`HTTPエラー! ステータス: ${response.status}, ボディ: ${responseBodyText}`);
-      throw new Error(`サーバーとの通信に失敗 (ステータス: ${response.status})。応答: ${responseBodyText.substring(0,100)}...`);
-    }
-
-    if (!responseBodyText) {
-        console.error("サーバーからの応答が空でした。");
-        throw new Error("サーバーから空の応答がありました。");
-    }
-
-    let result;
-    try {
-        result = JSON.parse(responseBodyText);
-    } catch (parseError) {
-        console.error("サーバーからのJSON応答の解析に失敗:", responseBodyText, parseError);
-        throw new Error(`サーバーからの応答をJSONとして解析できませんでした。内容: ${responseBodyText.substring(0, 100)}...`);
-    }
-
-    console.log('サーバーからのパース済みレスポンス:', result);
-
-    if (result && result.status === 'success') {
-        alert('スタンプが正常に記録されました！\nQR内容: ' + qrData);
-        updateResultsDisplay(`記録成功: ${qrData}`, 'success');
-    } else {
-        const errorMessage = result && result.message ? result.message : "サーバー側で処理に失敗したか、予期しない応答がありました。";
-        console.error('サーバーサイド処理エラーまたは予期しない応答:', errorMessage, result);
-        throw new Error(errorMessage);
-    }
-
-  } catch (error) {
-    console.error('データ送信処理エラー (sendDataToSheet catch):', error.name, error.message, error.stack);
-    alert(`スタンプ記録エラーが発生しました。\nエラー: ${error.message}\nQR内容: ${qrData}\nインターネット接続を確認するか、開発者に連絡してください。`);
-    updateResultsDisplay(`送信エラー: ${qrData}`, 'error');
-  }
-}
-
-/**
  * QRコードのスキャンが成功したときに呼び出されるコールバック関数
- * @param {string} decodedText デコードされたテキストデータ
+ * 読み取ったデータをGlideの親ページにpostMessageで送信します。
+ * @param {string} decodedText デコードされたテキストデータ (QRコードの内容)
  * @param {object} decodedResult 詳細なデコード結果オブジェクト
  */
 function onScanSuccess(decodedText, decodedResult) {
     console.log(`コード検出成功 = ${decodedText}`, decodedResult);
-    updateResultsDisplay(`スキャン結果: ${decodedText}`, 'info');
+    updateResultsDisplay(`QRコード読取成功: ${decodedText}`, 'info');
 
     const userEmail = getQueryParam('email');
+    const scannedAt = new Date().toISOString(); // スキャン時刻
 
     if (!userEmail) {
-        const errorMsg = "エラー: 参加者情報（メールアドレス）が見つかりません。ページのURLを確認してください。";
+        const errorMsg = "エラー: 参加者情報（メールアドレス）がURLパラメータから取得できませんでした。";
         console.error(errorMsg);
         alert(errorMsg);
         updateResultsDisplay('エラー: メールアドレス未設定', 'error');
         return;
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "ここに新しいデプロイで取得したGASのウェブアプリURLを貼り付け" || GAS_WEB_APP_URL.trim() === "") {
-         const errorMsg = "エラー: 送信先システムが正しく設定されていません。開発者に連絡してください。";
-         console.error(errorMsg, "Current GAS_WEB_APP_URL:", `"${GAS_WEB_APP_URL}"`);
-         alert(errorMsg);
-         updateResultsDisplay('エラー: 送信先URL未設定', 'error');
-         return;
-    }
+    // Glideの親ページにデータを送信するオブジェクト
+    const messageToGlide = {
+        type: 'qrScanResult', // メッセージの種類を識別するため (Glide側でこのタイプをリッスン)
+        payload: {
+            email: userEmail,
+            qrData: decodedText,
+            timestamp: scannedAt
+        }
+    };
 
-    sendDataToSheet(userEmail, decodedText, GAS_WEB_APP_URL);
+    // window.parent が存在するか確認 (iframe内から親ウィンドウにアクセス)
+    if (window.parent && window.parent !== window) {
+        // Glideアプリのオリジンを指定するのが最も安全ですが、
+        // 不明な場合は '*' を使用します (ただしセキュリティリスクを理解した上で)。
+        // Glideアプリの公開URLのオリジン (例: "https://yourapp.glideapp.io") を調べて指定することを推奨します。
+        const glideAppOrigin = '*'; // ★ Glideアプリのオリジンに変更推奨
+        
+        try {
+            window.parent.postMessage(messageToGlide, glideAppOrigin);
+            console.log('Glide親ページへのメッセージ送信成功:', messageToGlide);
+            updateResultsDisplay(`「${decodedText}」をアプリに送信しました。`, 'success');
+            alert(`スタンプ情報「${decodedText}」をアプリに送信しました。\nアプリ側で記録処理を行ってください。`);
+
+            // オプション: スキャン成功後にスキャナーを停止する
+            // html5QrcodeScanner インスタンスにアクセスできる必要がある
+            if (window.html5QrcodeScannerInstance) {
+                window.html5QrcodeScannerInstance.clear().catch(err => {
+                    console.error("スキャナーの停止に失敗:", err);
+                });
+                 updateResultsDisplay('スキャンを停止しました。再度スキャンするにはページを更新してください。', 'info');
+            }
+
+        } catch (postMessageError) {
+            console.error('Glide親ページへのメッセージ送信に失敗:', postMessageError);
+            updateResultsDisplay('エラー: アプリとの連携に失敗しました (送信エラー)。', 'error');
+            alert('エラー: アプリケーションとの連携中に問題が発生しました。');
+        }
+    } else {
+        console.warn('Glide親ページが見つかりません。Web Embedコンポーネント内で実行されていますか？');
+        updateResultsDisplay('エラー: アプリケーションの連携先が見つかりません。', 'error');
+        alert('エラー: このページはGlideアプリ内で使用されることを想定しています。');
+    }
 }
 
 /**
@@ -139,7 +100,7 @@ function onScanSuccess(decodedText, decodedResult) {
  * @param {string} error エラーメッセージ (通常は無視してOK)
  */
 function onScanFailure(error) {
-    // console.warn(`コードスキャンエラー = ${error}`);
+    // console.warn(`コードスキャンエラー = ${error}`); // デバッグ時以外はコメントアウト推奨
 }
 
 // HTMLドキュメントの読み込みが完了したら実行
@@ -154,30 +115,35 @@ document.addEventListener('DOMContentLoaded', (event) => {
         } else {
             userEmailDisplay.innerText = '参加者情報なし (URLに ?email=... が必要)';
             userEmailDisplay.style.color = 'red';
-            alert("参加者のメールアドレスがURLに含まれていません。\nスタンプラリーのリンクを確認してください。\n(例: .../index.html?email=your_email@example.com)");
+            // ページ読み込み時にメールアドレスがない場合はアラートを出す
+            alert("参加者のメールアドレスがURLパラメータに含まれていません。\nスタンプラリーのリンクを確認してください。\n(例: .../index.html?email=your_email@example.com)");
+            updateResultsDisplay('エラー: メールアドレスが設定されていません。', 'error');
         }
+    } else {
+        console.warn("ID 'user-email-display' の要素が見つかりません。");
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "ここに新しいデプロイで取得したGASのウェブアプリURLを貼り付け" || GAS_WEB_APP_URL.trim() === "") {
-        const errorMsg = "警告: アプリケーションの送信先URLが設定されていません。scanner.jsファイル内のGAS_WEB_APP_URLを更新してください。";
-        console.warn(errorMsg);
-        updateResultsDisplay(errorMsg, 'error');
+    // メールアドレスがない場合はスキャナーを初期化しないことも検討
+    if (!userEmail && userEmailDisplay) { // userEmailDisplayの存在も確認
+        // 何もしない、またはエラーメッセージを表示したままにする
+        return;
     }
-
-    const html5QrcodeScanner = new Html5QrcodeScanner(
-        "qr-reader", // スキャナーUIを埋め込むHTML要素のID
+    
+    // スキャナーインスタンスをグローバルスコープに格納して、onScanSuccessからアクセスできるようにする
+    window.html5QrcodeScannerInstance = new Html5QrcodeScanner(
+        "qr-reader",
         {
-            fps: 10, // スキャン頻度 (フレーム/秒)
-            qrbox: (viewportWidth, viewportHeight) => { // スキャン領域のサイズを動的に設定
-                const edgePercentage = 0.7; // ビューポートに対する割合
-                const minEdgeSize = Math.min(viewportWidth * edgePercentage, viewportHeight * edgePercentage, 300); // 最大300px
-                return { width: Math.max(minEdgeSize, 150), height: Math.max(minEdgeSize, 150) }; // 最小150px
+            fps: 10,
+            qrbox: (viewportWidth, viewportHeight) => {
+                const edgePercentage = 0.7;
+                const minEdgeSize = Math.min(viewportWidth * edgePercentage, viewportHeight * edgePercentage, 300);
+                return { width: Math.max(minEdgeSize, 150), height: Math.max(minEdgeSize, 150) };
             },
-            rememberLastUsedCamera: true, // 最後に使用したカメラを記憶
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] // ファイルからのスキャンを無効化
+            rememberLastUsedCamera: true,
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
         },
-        /* verbose= */ false // 詳細なログ出力を無効にする場合はfalse
+        false
     );
 
-    html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+    window.html5QrcodeScannerInstance.render(onScanSuccess, onScanFailure);
 });

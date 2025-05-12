@@ -66,7 +66,7 @@ function onScanSuccess(decodedText, decodedResult) {
         // Glideアプリのオリジンを指定するのが最も安全ですが、
         // 不明な場合は '*' を使用します (ただしセキュリティリスクを理解した上で)。
         // Glideアプリの公開URLのオリジン (例: "https://yourapp.glideapp.io") を調べて指定することを推奨します。
-        const glideAppOrigin = '*'; // ★ Glideアプリのオリジンに変更推奨
+        const glideAppOrigin = '*'; // ★ 例: https://<あなたのアプリ名>.glideapp.io/dl/<スクリーンID>に変更推奨
         
         try {
             window.parent.postMessage(messageToGlide, glideAppOrigin);

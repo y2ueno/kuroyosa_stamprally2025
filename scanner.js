@@ -3,7 +3,7 @@
 // --- Configuration ---
 // ★★★重要★★★: Google Apps Scriptのウェブアプリを「新しいデプロイ」でデプロイし、
 // 発行されたウェブアプリのURLを以下の "" の中に正確に貼り付けてください。
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxTcR4051DFbP4Du9Af2JLkLt1o-DUKS5sOg49TlngRcklFrtjYT3zI5LPg8xXyt_Bs/exec";
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzAmnpzUlKshb8g_MYYzYHwAD8VlkM1BpICSxkHOmq4-x88PE4EKc1Dq6GKmLuuh_0b/exec";
 // 例: "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
 // -------------------
 

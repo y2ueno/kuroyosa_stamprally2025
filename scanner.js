@@ -1,33 +1,10 @@
 // scanner.js
 
-
-// scanner.js にテスト用関数を追加
-async function testGetDataFromSheet(gasWebAppUrl) {
-  console.log("テストGETリクエスト送信先URL:", gasWebAppUrl);
-  try {
-    // GETリクエストなので、URLにパラメータを追加
-    const testUrl = new URL(gasWebAppUrl);
-    testUrl.searchParams.append('testParam', 'helloFromGet');
-
-    const response = await fetch(testUrl.toString(), { // URLオブジェクトを文字列に変換
-      method: 'GET',
-      // GETなのでheadersやbodyは通常不要
-      redirect: 'follow'
-    });
-    const responseBodyText = await response.text();
-    console.log("テストGET サーバーからの生レスポンステキスト:", responseBodyText);
-    // doGetは通常HTMLやTEXTを返すのでJSON.parseはしない
-  } catch (error) {
-    console.error('テストGET データ送信エラー:', error);
-  }
-}
-// onScanSuccess などから呼び出す
-// testGetDataFromSheet(GAS_WEB_APP_URL);
-
-
 // --- Configuration ---
-// GAS Web Appのデプロイ済みURLを設定 "https://script.google.com/macros/s/AKfycbwLeeOYby80z5bhXA6F-ct0f8omT8rtBQqBajkC-qczBuj07EBt1A-PKRZJ6231KBerRw/exec"
-const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwLeeOYby80z5bhXA6F-ct0f8omT8rtBQqBajkC-qczBuj07EBt1A-PKRZJ6231KBerRw/exec"; // ★★★ URLの重複を修正しました ★★★
+// ★★★重要★★★: Google Apps Scriptのウェブアプリを「新しいデプロイ」でデプロイし、
+// 発行されたウェブアプリのURLを以下の "" の中に正確に貼り付けてください。
+const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxTcR4051DFbP4Du9Af2JLkLt1o-DUKS5sOg49TlngRcklFrtjYT3zI5LPg8xXyt_Bs/exec";
+// 例: "https://script.google.com/macros/s/XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX/exec";
 // -------------------
 
 /**
@@ -54,6 +31,8 @@ function updateResultsDisplay(message, type = 'info') {
             resultsEl.classList.add('success');
         } else if (type === 'error') {
             resultsEl.classList.add('error');
+        } else {
+            resultsEl.classList.add('info');
         }
     }
 }
@@ -68,7 +47,7 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
   const formData = new URLSearchParams();
   formData.append('email', email);
   formData.append('qrData', qrData);
-  formData.append('scannedAt', new Date().toISOString());
+  formData.append('scannedAt', new Date().toISOString()); // クライアント側のスキャン時刻
 
   console.log("送信データ (form-urlencoded):", formData.toString());
   console.log("送信先URL:", gasWebAppUrl);
@@ -82,18 +61,18 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
         'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
       },
       body: formData.toString(),
-      redirect: 'follow',
+      redirect: 'follow', // リダイレクトを追従
     });
 
-    const responseBodyText = await response.text(); // まずテキストとしてレスポンスを取得
+    const responseBodyText = await response.text();
     console.log("サーバーからの生レスポンステキスト:", responseBodyText);
 
-    if (!response.ok) { // ステータスコードが200-299の範囲外の場合
+    if (!response.ok) {
+      // HTTPステータスコードが200-299の範囲外の場合
       console.error(`HTTPエラー! ステータス: ${response.status}, ボディ: ${responseBodyText}`);
-      throw new Error(`サーバーとの通信に失敗しました (ステータス: ${response.status})。応答: ${responseBodyText.substring(0,100)}`);
+      throw new Error(`サーバーとの通信に失敗 (ステータス: ${response.status})。応答: ${responseBodyText.substring(0,100)}...`);
     }
 
-    // レスポンスが空でないか確認してからJSONパースを試みる
     if (!responseBodyText) {
         console.error("サーバーからの応答が空でした。");
         throw new Error("サーバーから空の応答がありました。");
@@ -118,9 +97,9 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
         throw new Error(errorMessage);
     }
 
-  } catch (error) { // fetch自体が失敗した場合 (ネットワークエラー、CORSブロックなど) または上記でthrowされたエラー
+  } catch (error) {
     console.error('データ送信処理エラー (sendDataToSheet catch):', error.name, error.message, error.stack);
-    alert('スタンプ記録エラーが発生しました。\nエラー: ' + error.message + "\nQR内容: " + qrData + "\nインターネット接続を確認するか、開発者に連絡してください。");
+    alert(`スタンプ記録エラーが発生しました。\nエラー: ${error.message}\nQR内容: ${qrData}\nインターネット接続を確認するか、開発者に連絡してください。`);
     updateResultsDisplay(`送信エラー: ${qrData}`, 'error');
   }
 }
@@ -131,7 +110,7 @@ async function sendDataToSheet(email, qrData, gasWebAppUrl) {
  * @param {object} decodedResult 詳細なデコード結果オブジェクト
  */
 function onScanSuccess(decodedText, decodedResult) {
-    console.log(`コード検出成功 = ${decodedText}`, decodedResult); // scanner.js:113
+    console.log(`コード検出成功 = ${decodedText}`, decodedResult);
     updateResultsDisplay(`スキャン結果: ${decodedText}`, 'info');
 
     const userEmail = getQueryParam('email');
@@ -144,7 +123,7 @@ function onScanSuccess(decodedText, decodedResult) {
         return;
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE") || GAS_WEB_APP_URL.trim() === "") {
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "ここに新しいデプロイで取得したGASのウェブアプリURLを貼り付け" || GAS_WEB_APP_URL.trim() === "") {
          const errorMsg = "エラー: 送信先システムが正しく設定されていません。開発者に連絡してください。";
          console.error(errorMsg, "Current GAS_WEB_APP_URL:", `"${GAS_WEB_APP_URL}"`);
          alert(errorMsg);
@@ -152,12 +131,12 @@ function onScanSuccess(decodedText, decodedResult) {
          return;
     }
 
-    sendDataToSheet(userEmail, decodedText, GAS_WEB_APP_URL); // scanner.js:134
+    sendDataToSheet(userEmail, decodedText, GAS_WEB_APP_URL);
 }
 
 /**
  * QRコードのスキャンが失敗したときに呼び出されるコールバック関数
- * @param {string} error エラーメッセージ
+ * @param {string} error エラーメッセージ (通常は無視してOK)
  */
 function onScanFailure(error) {
     // console.warn(`コードスキャンエラー = ${error}`);
@@ -167,7 +146,7 @@ function onScanFailure(error) {
 document.addEventListener('DOMContentLoaded', (event) => {
     const userEmailDisplay = document.getElementById('user-email-display');
     const userEmail = getQueryParam('email');
-    console.log("ページ読み込み完了。ユーザー:", userEmail); // scanner.js:149
+    console.log("ページ読み込み完了。ユーザー:", userEmail);
 
     if (userEmailDisplay) {
         if (userEmail) {
@@ -179,28 +158,25 @@ document.addEventListener('DOMContentLoaded', (event) => {
         }
     }
 
-    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.includes("YOUR_GAS_WEB_APP_URL_HERE") || GAS_WEB_APP_URL.trim() === "") {
+    if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL === "ここに新しいデプロイで取得したGASのウェブアプリURLを貼り付け" || GAS_WEB_APP_URL.trim() === "") {
         const errorMsg = "警告: アプリケーションの送信先URLが設定されていません。scanner.jsファイル内のGAS_WEB_APP_URLを更新してください。";
         console.warn(errorMsg);
         updateResultsDisplay(errorMsg, 'error');
     }
 
     const html5QrcodeScanner = new Html5QrcodeScanner(
-        "qr-reader",
+        "qr-reader", // スキャナーUIを埋め込むHTML要素のID
         {
-            fps: 10,
-            qrbox: (viewportWidth, viewportHeight) => {
-                const edgePercentage = 0.8;
-                const minEdgeSize = Math.min(viewportWidth, viewportHeight);
-                let qrboxSize = Math.floor(minEdgeSize * edgePercentage);
-                qrboxSize = Math.min(qrboxSize, 250);
-                qrboxSize = Math.max(qrboxSize, 100);
-                return { width: qrboxSize, height: qrboxSize};
+            fps: 10, // スキャン頻度 (フレーム/秒)
+            qrbox: (viewportWidth, viewportHeight) => { // スキャン領域のサイズを動的に設定
+                const edgePercentage = 0.7; // ビューポートに対する割合
+                const minEdgeSize = Math.min(viewportWidth * edgePercentage, viewportHeight * edgePercentage, 300); // 最大300px
+                return { width: Math.max(minEdgeSize, 150), height: Math.max(minEdgeSize, 150) }; // 最小150px
             },
-            rememberLastUsedCamera: true,
-            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+            rememberLastUsedCamera: true, // 最後に使用したカメラを記憶
+            supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] // ファイルからのスキャンを無効化
         },
-        false
+        /* verbose= */ false // 詳細なログ出力を無効にする場合はfalse
     );
 
     html5QrcodeScanner.render(onScanSuccess, onScanFailure);

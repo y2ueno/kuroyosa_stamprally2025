@@ -3,7 +3,7 @@
 /**
  * ★★★ Glideで生成されたWebhook URLをここに設定してください ★★★
  */
-const GLIDE_WEBHOOK_URL = 'https://YOUR_GLIDE_GENERATED_WEBHOOK_URL_HERE'; // 例: https://hooks.glideapps.com/xxxxxxxx
+const GLIDE_WEBHOOK_URL = 'https://go.glideapps.com/api/container/plugin/webhook-trigger/b2Ps68iDJmpTVBfsXJdE/dc48b760-8e91-4c32-a36a-3471c2b2207b'; // 例: https://hooks.glideapps.com/xxxxxxxx
 
 /**
  * URLクエリパラメータを取得するヘルパー関数

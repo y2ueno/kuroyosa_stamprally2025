@@ -1,4 +1,9 @@
-// scanner.js (window.parent.postMessage連携版)
+// scanner.js (Webhook連携版)
+
+/**
+ * ★★★ Glideで生成されたWebhook URLをここに設定してください ★★★
+ */
+const GLIDE_WEBHOOK_URL = 'https://YOUR_GLIDE_GENERATED_WEBHOOK_URL_HERE'; // 例: https://hooks.glideapps.com/xxxxxxxx
 
 /**
  * URLクエリパラメータを取得するヘルパー関数
@@ -27,136 +32,133 @@ function updateResultsDisplay(message, type = 'info') {
         } else {
             resultsEl.classList.add('info');
         }
-        resultsEl.style.display = 'flex'; // Ensure it's visible
+        resultsEl.style.display = 'flex';
     }
 }
 
 /**
  * QRコードのスキャンが成功したときに呼び出されるコールバック関数
- * 読み取ったデータをGlideの親ページにpostMessageで送信します。
+ * 読み取ったデータをGlideのWebhookに送信します。
  * @param {string} decodedText デコードされたテキストデータ (QRコードの内容)
  * @param {object} decodedResult 詳細なデコード結果オブジェクト
  */
-function onScanSuccess(decodedText, decodedResult) {
+async function onScanSuccess(decodedText, decodedResult) {
     console.log(`コード検出成功 = ${decodedText}`, decodedResult);
     updateResultsDisplay(`QRコード読取成功: ${decodedText}`, 'info');
 
     const userEmail = getQueryParam('email');
-    const scannedAt = new Date().toISOString(); // スキャン時刻
+    const scannedAt = new Date().toISOString(); // スキャン時刻 (ISO 8601形式)
 
     if (!userEmail) {
         const errorMsg = "エラー: 参加者情報（メールアドレス）がURLパラメータから取得できませんでした。";
         console.error(errorMsg);
         alert(errorMsg + "\n再度、スタンプラリー画面を開き直してください。");
         updateResultsDisplay('エラー: メールアドレス未設定', 'error');
-        // スキャナーを停止する場合
         if (window.html5QrcodeScannerInstance) {
              window.html5QrcodeScannerInstance.clear().catch(err => console.error("スキャナーの停止に失敗:", err));
         }
         return;
     }
 
-    // Glideの親ページにデータを送信するオブジェクト
-    const messageToGlide = {
-        type: 'qrScanResult', // メッセージの種類を識別するため (Glide側でこのタイプをリッスン)
-        payload: {
-            email: userEmail,
-            qrData: decodedText,
-            timestamp: scannedAt
-        }
+    if (!GLIDE_WEBHOOK_URL || GLIDE_WEBHOOK_URL === 'https://YOUR_GLIDE_GENERATED_WEBHOOK_URL_HERE') {
+        const errorMsg = "エラー: Webhook URLが設定されていません。管理者にお問い合わせください。";
+        console.error(errorMsg);
+        alert(errorMsg);
+        updateResultsDisplay('エラー: 設定不備（Webhook URL未設定）', 'error');
+        return;
+    }
+
+    // GlideのWebhookに送信するデータ
+    const dataToSend = {
+        email: userEmail,       // ユーザーのメールアドレス
+        qrData: decodedText,    // スキャンしたQRコードの内容
+        scannedTimestamp: scannedAt // スキャンした日時
+        // 必要に応じて他のデータもここに追加できます
     };
 
-    // window.parent が存在するか確認 (iframe内から親ウィンドウにアクセス)
-    if (window.parent && window.parent !== window) {
-        // ★★★ Glideアプリのオリジンを指定してください ★★★
-        // セキュリティ上、 '*' は非推奨です。Glideアプリの公開URLのオリジンを指定してください。
-        // 例: const glideAppOrigin = 'https://xxxxxx.glideapp.io';
-        const glideAppOrigin = '*'; // 動作確認用。本番ではGlideアプリのオリジンを指定してください。
+    updateResultsDisplay(`「${decodedText}」を送信中...`, 'info');
 
-        try {
-            window.parent.postMessage(messageToGlide, glideAppOrigin);
-            console.log('Glide親ページへのメッセージ送信成功:', messageToGlide);
+    try {
+        const response = await fetch(GLIDE_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(dataToSend)
+        });
+
+        if (response.ok) {
+            const responseData = await response.json(); // Glide側からの応答を期待する場合
+            console.log('Webhookへのデータ送信成功:', responseData);
             updateResultsDisplay(`「${decodedText}」をアプリに送信しました。`, 'success');
             alert(`スタンプ情報「${decodedText}」をアプリに送信しました。\nアプリが自動で記録します。`);
 
-            // オプション: スキャン成功後にスキャナーを停止する
             if (window.html5QrcodeScannerInstance) {
                 window.html5QrcodeScannerInstance.clear().catch(err => {
                     console.error("スキャナーの停止に失敗:", err);
                 });
-                // 少し遅延させてメッセージを表示
                 setTimeout(() => {
                      updateResultsDisplay('スキャンを停止しました。再度スキャンするにはページを更新してください。', 'info');
                 }, 500);
             }
-
-        } catch (postMessageError) {
-            console.error('Glide親ページへのメッセージ送信に失敗:', postMessageError);
-            updateResultsDisplay('エラー: アプリとの連携に失敗しました (送信エラー)。', 'error');
-            alert('エラー: アプリケーションとの連携中に問題が発生しました。システム管理者に連絡してください。');
+        } else {
+            const errorText = await response.text();
+            console.error('Webhookへのデータ送信失敗:', response.status, errorText);
+            updateResultsDisplay(`エラー: アプリとの連携に失敗しました (${response.status})。`, 'error');
+            alert(`エラー: アプリケーションとの連携中に問題が発生しました (ステータス: ${response.status})。\n${errorText}`);
         }
-    } else {
-        console.warn('Glide親ページが見つかりません。Web Embedコンポーネント内で実行されていますか？');
-        updateResultsDisplay('エラー: アプリケーションの連携先が見つかりません。', 'error');
-        alert('エラー: このページはGlideアプリ内で使用されることを想定しています。');
+    } catch (error) {
+        console.error('Webhook送信中にネットワークエラー:', error);
+        updateResultsDisplay('エラー: アプリとの連携に失敗しました (ネットワークエラー)。', 'error');
+        alert('エラー: アプリケーションとの連携中にネットワークの問題が発生しました。通信環境の良い場所でお試しください。');
     }
 }
 
 /**
  * QRコードのスキャンが失敗したときに呼び出されるコールバック関数
- * @param {string} error エラーメッセージ (通常は無視してOK)
  */
 function onScanFailure(error) {
-    // 頻繁にログが出るため、デバッグ時以外はコメントアウト推奨
-    // console.warn(`コードスキャンエラー = ${error}`);
+    // console.warn(`コードスキャンエラー = ${error}`); // デバッグ時以外はコメントアウト推奨
 }
 
 // HTMLドキュメントの読み込みが完了したら実行
 document.addEventListener('DOMContentLoaded', (event) => {
     const userEmailDisplay = document.getElementById('user-email-display');
-    const resultsDisplay = document.getElementById('qr-reader-results');
     const userEmail = getQueryParam('email');
     console.log("ページ読み込み完了。ユーザー:", userEmail);
 
     if (userEmailDisplay) {
         if (userEmail) {
             userEmailDisplay.innerText = `参加者: ${userEmail}`;
-            userEmailDisplay.style.color = '#3f51b5'; // Restore default color
+            userEmailDisplay.style.color = '#3f51b5';
         } else {
             userEmailDisplay.innerText = '参加者情報なし (URLに ?email=... が必要)';
             userEmailDisplay.style.color = 'red';
-            // ページ読み込み時にメールアドレスがない場合はアラートを出す
             alert("参加者のメールアドレスがURLパラメータに含まれていません。\nスタンプラリーのリンクを確認してください。\n(例: .../index.html?email=your_email@example.com)");
             updateResultsDisplay('エラー: メールアドレスが設定されていません。QRコードをスキャンできません。', 'error');
-            // メールアドレスがない場合はスキャナーを初期化しない
-            return;
+            return; // メールアドレスがない場合はスキャナーを初期化しない
         }
     } else {
         console.warn("ID 'user-email-display' の要素が見つかりません。");
     }
 
-    // スキャナーインスタンスをグローバルスコープに格納して、onScanSuccessからアクセスできるようにする
-    // try-catchで囲み、エラー発生時にもユーザーにフィードバックを提供
     try {
         window.html5QrcodeScannerInstance = new Html5QrcodeScanner(
             "qr-reader",
             {
-                fps: 10, // スキャン頻度
+                fps: 10,
                 qrbox: (viewportWidth, viewportHeight) => {
-                    // スキャン領域のサイズをビューポートに基づいて調整
-                    const edgePercentage = 0.7; // スキャンボックスの端の割合
-                    const minEdgeSize = Math.min(viewportWidth * edgePercentage, viewportHeight * edgePercentage, 300); // 最大300px
-                    return { width: Math.max(minEdgeSize, 200), height: Math.max(minEdgeSize, 200) }; // 最低200px
+                    const edgePercentage = 0.7;
+                    const minEdgeSize = Math.min(viewportWidth * edgePercentage, viewportHeight * edgePercentage, 300);
+                    return { width: Math.max(minEdgeSize, 200), height: Math.max(minEdgeSize, 200) };
                 },
-                rememberLastUsedCamera: true, // 最後に使用したカメラを記憶
-                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA] // カメラのみを使用
+                rememberLastUsedCamera: true,
+                supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
             },
-            /* verbose= */ false // 詳細ログを無効化
+            false
         );
-
         window.html5QrcodeScannerInstance.render(onScanSuccess, onScanFailure);
-        updateResultsDisplay('QRコードをスキャンしてください', 'info'); // 初期メッセージ
-
+        updateResultsDisplay('QRコードをスキャンしてください', 'info');
     } catch (scannerError) {
         console.error("Html5QrcodeScanner の初期化に失敗:", scannerError);
         updateResultsDisplay('エラー: QRスキャナーの起動に失敗しました。カメラの許可を確認してください。', 'error');

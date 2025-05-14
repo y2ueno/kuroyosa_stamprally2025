@@ -1,4 +1,4 @@
-// scanner.js (Bearerトークン認証付き Webhook連携版)
+// scanner.js (複数回実行防止対策強化・Bearerトークン認証付き Webhook連携版)
 
 /**
  * ★★★ Glideで生成されたWebhook URL ★★★
@@ -11,11 +11,12 @@ const GLIDE_WEBHOOK_URL = 'https://go.glideapps.com/api/container/plugin/webhook
  */
 const GLIDE_BEARER_TOKEN = 'fe82b0fd-b112-498a-b357-1d27d9665441';
 
+// グローバル変数としてスキャナーインスタンスと処理中フラグを保持
+let html5QrcodeScannerInstance = null;
+let isProcessingScan = false; // スキャン処理中を示すフラグ
 
 /**
  * URLクエリパラメータを取得するヘルパー関数
- * @param {string} name 取得したいパラメータ名
- * @returns {string|null} パラメータの値、または見つからない場合はnull
  */
 function getQueryParam(name) {
     const urlParams = new URLSearchParams(window.location.search);
@@ -24,8 +25,6 @@ function getQueryParam(name) {
 
 /**
  * 結果表示エリアを更新する関数
- * @param {string} message 表示するメッセージ
- * @param {'info'|'success'|'error'} type メッセージの種類
  */
 function updateResultsDisplay(message, type = 'info') {
     const resultsEl = document.getElementById('qr-reader-results');
@@ -45,44 +44,56 @@ function updateResultsDisplay(message, type = 'info') {
 
 /**
  * QRコードのスキャンが成功したときに呼び出されるコールバック関数
- * 読み取ったデータをGlideのWebhookに送信します。
- * @param {string} decodedText デコードされたテキストデータ (QRコードの内容)
- * @param {object} decodedResult 詳細なデコード結果オブジェクト
  */
 async function onScanSuccess(decodedText, decodedResult) {
+    if (isProcessingScan) {
+        console.log("現在処理中のため、新たなスキャン結果は無視します。");
+        return;
+    }
+    isProcessingScan = true; // 処理開始、フラグを立てる
     console.log(`コード検出成功 = ${decodedText}`, decodedResult);
-    updateResultsDisplay(`QRコード読取成功: ${decodedText}`, 'info');
+    updateResultsDisplay(`QRコード認識: ${decodedText}`, 'info');
+
+    // スキャン成功後、すぐにスキャナーを停止して多重実行を防ぐ
+    if (html5QrcodeScannerInstance && html5QrcodeScannerInstance.getState() === Html5QrcodeScannerState.SCANNING) {
+        try {
+            await html5QrcodeScannerInstance.clear(); // スキャナーをクリア（停止）
+            console.log("スキャナーを停止しました。");
+        } catch (err) {
+            console.error("スキャナーの停止に失敗:", err);
+            // 停止に失敗しても処理を続行するが、ログには残す
+        }
+    }
 
     const userEmail = getQueryParam('email');
-    const scannedAt = new Date().toISOString(); // スキャン時刻 (ISO 8601形式 UTC)
+    const scannedAt = new Date().toISOString();
 
     if (!userEmail) {
         const errorMsg = "エラー: 参加者情報（メールアドレス）がURLパラメータから取得できませんでした。";
         console.error(errorMsg);
         alert(errorMsg + "\n再度、スタンプラリー画面を開き直してください。");
         updateResultsDisplay('エラー: メールアドレス未設定。QRをスキャンできません。', 'error');
-        if (window.html5QrcodeScannerInstance) {
-             window.html5QrcodeScannerInstance.clear().catch(err => console.error("スキャナーの停止に失敗:", err));
-        }
+        isProcessingScan = false; // エラーなのでフラグを戻す
         return;
     }
 
-    if (!GLIDE_WEBHOOK_URL || GLIDE_WEBHOOK_URL === 'YOUR_GLIDE_GENERATED_WEBHOOK_URL_HERE') { // 初期値チェック
+    if (!GLIDE_WEBHOOK_URL || GLIDE_WEBHOOK_URL === 'YOUR_GLIDE_GENERATED_WEBHOOK_URL_HERE') {
         const errorMsg = "エラー: Webhook URLが正しく設定されていません。システム管理者にお問い合わせください。";
         console.error(errorMsg);
         alert(errorMsg);
         updateResultsDisplay('エラー: システム設定不備 (Webhook URL未設定)', 'error');
+        isProcessingScan = false;
         return;
     }
 
-    if (!GLIDE_BEARER_TOKEN) { // Bearerトークンの存在チェック
+    if (!GLIDE_BEARER_TOKEN) {
         const errorMsg = "エラー: 認証トークンが設定されていません。システム管理者にお問い合わせください。";
         console.error(errorMsg);
         alert(errorMsg);
         updateResultsDisplay('エラー: システム設定不備 (認証トークン未設定)', 'error');
+        isProcessingScan = false;
         return;
     }
-
 
     const dataToSend = {
         email: userEmail,
@@ -97,7 +108,7 @@ async function onScanSuccess(decodedText, decodedResult) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GLIDE_BEARER_TOKEN}` // Bearerトークンをヘッダーに追加
+                'Authorization': `Bearer ${GLIDE_BEARER_TOKEN}`
             },
             body: JSON.stringify(dataToSend)
         });
@@ -105,44 +116,39 @@ async function onScanSuccess(decodedText, decodedResult) {
         if (response.ok) {
             console.log('Webhookへのデータ送信成功: Status ' + response.status);
             updateResultsDisplay(`スタンプ「${decodedText}」を記録しました！`, 'success');
-            alert(`スタンプ情報「${decodedText}」を記録しました。\n続けて他のQRコードもスキャンできます。`);
-
-            if (window.html5QrcodeScannerInstance) {
-                try {
-                    await window.html5QrcodeScannerInstance.clear();
-                    console.log("スキャナーをクリアしました。");
-                     setTimeout(() => {
-                        updateResultsDisplay('スキャンが完了しました。再度スキャンするにはページを更新してください。', 'info');
-                    }, 1500);
-                } catch (err) {
-                    console.error("スキャナーのクリアに失敗:", err);
-                }
-            }
+            alert(`スタンプ情報「${decodedText}」を記録しました。`);
+            // 成功後、ページ更新を促すメッセージを表示
+            setTimeout(() => {
+                updateResultsDisplay('記録が完了しました。続けてスキャンするにはページを更新してください。', 'info');
+            }, 2000); // 2秒後にメッセージ変更
         } else {
-            const errorText = await response.text(); // エラー内容をテキストで取得
+            const errorText = await response.text();
             console.error(`Webhookへのデータ送信失敗: Status ${response.status}`, errorText);
-            // 401エラーの場合はトークンに関するメッセージを強調
             if (response.status === 401) {
-                 updateResultsDisplay(`エラー: 認証に失敗しました (コード: ${response.status})。トークンを確認してください。`, 'error');
-                 alert(`エラー: スタンプの記録に失敗しました (認証エラー: ${response.status})。\n内容: ${errorText}\n設定された認証トークンが正しいか確認してください。`);
+                updateResultsDisplay(`エラー: 認証に失敗 (コード: ${response.status})。トークンを確認してください。`, 'error');
+                alert(`エラー: スタンプ記録失敗 (認証エラー: ${response.status})。\n内容: ${errorText}\n認証トークンを確認してください。`);
             } else {
-                updateResultsDisplay(`エラー: 記録に失敗しました (サーバーエラー: ${response.status})。`, 'error');
-                alert(`エラー: スタンプの記録に失敗しました (サーバーエラー: ${response.status})。\n内容: ${errorText}\n時間をおいて再度お試しください。`);
+                updateResultsDisplay(`エラー: 記録失敗 (サーバーエラー: ${response.status})。`, 'error');
+                alert(`エラー: スタンプ記録失敗 (サーバーエラー: ${response.status})。\n内容: ${errorText}\n時間をおいて再度お試しください。`);
             }
         }
     } catch (error) {
         console.error('Webhook送信中にネットワークエラー:', error);
-        updateResultsDisplay('エラー: 記録に失敗しました (ネットワーク接続エラー)。', 'error');
-        alert('エラー: スタンプの記録中にネットワーク接続の問題が発生しました。\n通信環境の良い場所で再度お試しください。');
+        updateResultsDisplay('エラー: 記録失敗 (ネットワーク接続エラー)。', 'error');
+        alert('エラー: スタンプ記録中にネットワーク接続の問題が発生しました。\n通信環境の良い場所で再度お試しください。');
+    } finally {
+        // isProcessingScan = false; // ページ更新を促すため、ここではフラグを戻さない。
+                                  // もしページ更新なしで連続スキャンさせたい場合は、ここで戻す。
+                                  // ただし、その場合はスキャナーの再開処理も必要。
+                                  // 現状は「ページ更新で再スキャン」の運用。
     }
 }
 
 /**
  * QRコードのスキャンが失敗したときに呼び出されるコールバック関数
- * @param {string} error エラーメッセージ
  */
 function onScanFailure(error) {
-    // console.warn(`コードスキャンエラー = ${error}`);
+    // console.warn(`コードスキャンエラー = ${error}`); // デバッグ時以外はコメントアウト推奨
 }
 
 // HTMLドキュメントの読み込みが完了したら実行
@@ -167,7 +173,8 @@ document.addEventListener('DOMContentLoaded', (event) => {
     }
 
     try {
-        window.html5QrcodeScannerInstance = new Html5QrcodeScanner(
+        // スキャナーインスタンスをグローバル変数に格納
+        html5QrcodeScannerInstance = new Html5QrcodeScanner(
             "qr-reader",
             {
                 fps: 10,
@@ -181,7 +188,8 @@ document.addEventListener('DOMContentLoaded', (event) => {
             },
             false
         );
-        window.html5QrcodeScannerInstance.render(onScanSuccess, onScanFailure);
+        html5QrcodeScannerInstance.render(onScanSuccess, onScanFailure);
+        isProcessingScan = false; // スキャナー描画後、処理フラグを初期化
         updateResultsDisplay('QRコードをカメラにかざしてください', 'info');
 
     } catch (scannerError) {

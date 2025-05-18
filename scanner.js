@@ -4,14 +4,14 @@
  * ★★★ Glideで生成されたWebhook URL ★★★
  * GlideアプリのWebhookトリガーで生成されたURLに置き換えてください。
  */
-const GLIDE_WEBHOOK_URL = 'https://go.glideapps.com/api/container/plugin/webhook-trigger/YOUR_WEBHOOK_ID/YOUR_TRIGGER_ID'; // 例: 'https://go.glideapps.com/api/container/plugin/webhook-trigger/b2Ps68iDJmpTVBfsXJdE/dc48b760-8e91-4c32-a36a-3471c2b2207b'
+const GLIDE_WEBHOOK_URL = 'https://go.glideapps.com/api/container/plugin/webhook-trigger/b2Ps68iDJmpTVBfsXJdE/dc48b760-8e91-4c32-a36a-3471c2b2207b'; // 例: 'https://go.glideapps.com/api/container/plugin/webhook-trigger/b2Ps68iDJmpTVBfsXJdE/dc48b760-8e91-4c32-a36a-3471c2b2207b'
 
 /**
  * ★★★ Glide Webhook 用の Bearer トークン ★★★
  * GlideアプリのWebhook設定で確認できるBearerトークンに置き換えてください。
  * 重要: このトークンは機密情報です。クライアントサイドに直接記述する場合のセキュリティリスクを理解してください。
  */
-const GLIDE_BEARER_TOKEN = 'YOUR_GLIDE_BEARER_TOKEN'; // 例: 'fe82b0fd-b112-498a-b357-1d27d9665441'
+const GLIDE_BEARER_TOKEN = 'fe82b0fd-b112-498a-b357-1d27d9665441'; // 例: 'fe82b0fd-b112-498a-b357-1d27d9665441'
 
 /**
  * ★★★ 変更点 ★★★
